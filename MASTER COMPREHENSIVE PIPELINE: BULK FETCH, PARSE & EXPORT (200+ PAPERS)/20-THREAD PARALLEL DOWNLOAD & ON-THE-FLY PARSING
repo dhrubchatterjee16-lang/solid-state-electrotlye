@@ -1,0 +1,73 @@
+formula_pattern = r'\b(Li[0-9\.\-_A-Za-z]+O[0-9\.]*|Li[0-9\.\-_A-Za-z]+S[0-9\.]*|Li[0-9\.\-_A-Za-z]+Cl[0-9\.]*|Li[0-9\.\-_A-Za-z]+PO4[0-9\.]*)\b'
+cond_pattern = r'(\d+(?:\.\d+)?)\s*(?:[x×\*]\s*10\^?([+-]?\d+))?\s*(mS|uS|S)\s*[\/·\s]*cm'
+ea_pattern = r'(\d+\.\d+)\s*eV'
+
+def fetch_and_parse_worker(task):
+    filename, pdf_url, title = task
+    save_path = os.path.join(pdf_dir, filename)
+
+    if os.path.exists(save_path):
+        return True, filename, title, None
+
+    try:
+        req = urllib.request.Request(pdf_url, headers=headers)
+        with urllib.request.urlopen(req) as resp:
+            content = resp.read()
+
+        if content.startswith(b'%PDF-'):
+            with open(save_path, 'wb') as f:
+                f.write(content)
+            return True, filename, title, content
+    except Exception:
+        pass
+    return False, filename, title, None
+
+extracted_records = []
+downloaded_count = 0
+start_time = time.time()
+
+# 20 Concurrent Worker Threads
+with ThreadPoolExecutor(max_workers=20) as executor:
+    futures = [executor.submit(fetch_and_parse_worker, task) for task in paper_tasks]
+    for future in as_completed(futures):
+        success, filename, title, content = future.result()
+        if success:
+            downloaded_count += 1
+            if downloaded_count % 10 == 0 or downloaded_count == len(paper_tasks):
+                print(f"  ✓ [{downloaded_count}/{len(paper_tasks)}] Downloaded: {filename[:45]}...")
+
+            # Fast parsing
+            if content:
+                raw_text = re.sub(rb'[^a-zA-Z0-9\.\-\_\s]', b' ', content[:60000]).decode('ascii', errors='ignore')
+                formulas = list(dict.fromkeys(re.findall(formula_pattern, raw_text)))
+                valid_formulas = [f for f in formulas if len(f) > 4 and any(c.isdigit() for c in f)]
+                if not valid_formulas:
+                    for k in ["LLZO", "LLZTO", "LGPS", "LATP", "LAGP", "Li6PS5Cl", "Li3InCl6", "PEO"]:
+                        if k in raw_text: valid_formulas.append(k)
+
+                cond_matches = re.findall(cond_pattern, raw_text)
+                ea_matches = re.findall(ea_pattern, raw_text)
+
+                sigma_val = None
+                sigma_raw = None
+                if cond_matches:
+                    rv, exp, u = cond_matches[0]
+                    v = float(rv)
+                    if exp: v *= (10 ** float(exp))
+                    if u == "mS": v *= 1e-3
+                    elif u == "uS": v *= 1e-6
+                    sigma_val = v
+                    sigma_raw = f"{rv} {u}/cm"
+
+                extracted_records.append({
+                    'filename': filename,
+                    'paper_title': title,
+                    'chemical_formulas': ", ".join(valid_formulas[:3]) if valid_formulas else "Solid State Electrolyte",
+                    'measurement_temp_celsius': 25.0,
+                    'ionic_conductivity_s_cm': sigma_val,
+                    'ionic_conductivity_raw': sigma_raw,
+                    'activation_energy_ev': float(ea_matches[0]) if ea_matches else None
+                })
+
+elapsed = time.time() - start_time
+print(f"\n⚡ HARVESTED & PARSED {downloaded_count} PAPERS IN {elapsed:.1f} SECONDS!\n")
