@@ -1,0 +1,80 @@
+import os
+import time
+import json
+import urllib.parse
+import urllib.request
+import shutil
+from google.colab import files
+
+download_dir = "./bulk_papers"
+os.makedirs(download_dir, exist_ok=True)
+
+# Search topics covering all Solid-State Electrolyte classes
+SEARCH_TOPICS = [
+    "solid state electrolyte ionic conductivity",
+    "garnet LLZO solid electrolyte",
+    "sulfide LGPS solid electrolyte",
+    "NASICON LATP solid electrolyte",
+    "halide solid electrolyte Li3InCl6",
+    "polymer solid electrolyte LiTFSI",
+    "antiperovskite solid electrolyte Li3OCl",
+    "all solid state lithium battery electrolyte"
+]
+
+print("🚀 STARTING BULK PDF DOWNLOAD FROM EUROPE PMC & OPEN-ACCESS REPOSITORIES...\n")
+
+downloaded_count = 0
+for topic in SEARCH_TOPICS:
+    print(f"🔍 Searching topic: '{topic}'...")
+    encoded_query = urllib.parse.quote(f"{topic} OPEN_ACCESS:y HAS_PDF:y")
+    url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query={encoded_query}&format=json&pageSize=10"
+
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+
+        results = data.get('resultList', {}).get('result', [])
+
+        for paper in results:
+            pmcid = paper.get('pmcid')
+            title = paper.get('title', 'Paper')
+
+            if not pmcid:
+                continue
+
+            pdf_url = f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmcid}/pdf/"
+
+            # Clean filename
+            clean_title = "".join(c for c in title if c.isalnum() or c in (' ', '_', '-')).rstrip()
+            clean_title = clean_title.replace(' ', '_')[:80]
+            filename = f"{clean_title}.pdf"
+            save_path = os.path.join(download_dir, filename)
+
+            if os.path.exists(save_path):
+                continue
+try:
+                pdf_req = urllib.request.Request(pdf_url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(pdf_req) as p_resp, open(save_path, 'wb') as f_out:
+                    f_out.write(p_resp.read())
+
+                downloaded_count += 1
+                print(f"  ✓ [{downloaded_count}] Saved: {filename[:60]}...")
+                time.sleep(0.5) # respectful delay
+            except Exception as e:
+                pass
+
+    except Exception as e:
+        print(f"  Error fetching topic '{topic}': {e}")
+
+print(f"\n=======================================================")
+print(f"🎉 SUCCESS! Downloaded {downloaded_count} full-text SSE research paper PDFs!")
+print(f"=======================================================\n")
+
+# Zip all 50+ PDFs into a single file
+print("📦 Zipping all PDF files into 'sse_research_papers_50plus.zip'...")
+shutil.make_archive("sse_research_papers_50plus", "zip", download_dir)
+
+# Download the zip file directly to your computer
+print("📥 Triggering download to your computer...")
+files.download("sse_research_papers_50plus.zip")
