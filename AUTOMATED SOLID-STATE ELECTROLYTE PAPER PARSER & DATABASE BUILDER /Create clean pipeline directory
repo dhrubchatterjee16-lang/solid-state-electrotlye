@@ -1,0 +1,2 @@
+os.makedirs("/content/sse_pipeline", exist_ok=True)
+%cd /content/sse_pipeline
