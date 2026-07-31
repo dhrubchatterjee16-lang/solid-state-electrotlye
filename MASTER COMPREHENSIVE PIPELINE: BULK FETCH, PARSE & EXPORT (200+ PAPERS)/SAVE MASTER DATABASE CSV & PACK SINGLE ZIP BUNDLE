@@ -1,0 +1,12 @@
+csv_file_path = os.path.join(pdf_dir, "master_sse_database_200plus.csv")
+pd.DataFrame(extracted_records).to_csv(csv_file_path, index=False)
+print(f"📊 Saved Master Database: 'master_sse_database_200plus.csv'")
+
+# Compress everything into 1 single package
+zip_package_name = "/content/master_sse_200plus_package"
+print(f"📦 Compressing {downloaded_count} PDFs + CSV Database into single ZIP file...")
+shutil.make_archive(zip_package_name, "zip", pdf_dir)
+
+print("\n📥 DOWNLOAD STARTING: Saving 'master_sse_200plus_package.zip' to your computer...")
+files.download(f"{zip_package_name}.zip")
+     
