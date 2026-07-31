@@ -1,0 +1,43 @@
+import os
+import re
+import socket
+import time
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
+import shutil
+import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from google.colab import files
+
+# Set strict 4-second network timeout to drop stalled connections
+socket.setdefaulttimeout(4)
+
+# Create Directories
+work_dir = "/content/master_sse_pipeline"
+pdf_dir = os.path.join(work_dir, "master_pdfs")
+os.makedirs(pdf_dir, exist_ok=True)
+%cd {work_dir}
+
+# Target total number of papers to harvest
+TARGET_PAPER_COUNT = 200
+
+# Targeted Search Topics
+TOPICS = [
+    "solid state electrolyte",
+    "lithium solid electrolyte",
+    "garnet LLZO",
+    "sulfide LGPS",
+    "NASICON LATP",
+    "halide electrolyte Li3InCl6",
+    "polymer electrolyte LiTFSI",
+    "antiperovskite Li3OCl",
+    "all solid state battery interface",
+    "composite solid electrolyte"
+]
+
+print(f"🚀 STARTING HIGH-SPEED MASTER CRAWLER (TARGET: {TARGET_PAPER_COUNT} PAPERS)...\n")
+
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+}
