@@ -1,0 +1,3 @@
+print("\n🚀 CREATING FILES, FETCHING PAPERS & PARSING...\n")
+!python pipeline.py --fetch --query "solid state electrolyte ionic conductivity" --max-papers 3
+!python pipeline.py --export-csv sse_database_output.csv
